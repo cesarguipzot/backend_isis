@@ -1,64 +1,80 @@
-const express = require("express");
-const cors = require("cors");
-const mysql = require("mysql2");
+// server.js
+import express from "express";
+import cors from "cors";
+import mysql from "mysql2/promise";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configuración de la base de datos
-const db = mysql.createConnection({
-  host: process.env.MYSQLHOST || "localhost",
-  user: process.env.MYSQLUSER || "root",
-  password: process.env.MYSQLPASSWORD || "123456",
-  database: process.env.MYSQLDATABASE || "backend_isis",
-  port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
-});
+// Render te da la variable MYSQL_URL automáticamente
+const MYSQL_URL = process.env.MYSQL_URL;
 
-// Probar conexión
-db.connect((err) => {
-  if (err) {
-    console.log("Error al conectar con MySQL:", err);
-  } else {
-    console.log("Conectado a MySQL");
+if (!MYSQL_URL) {
+  console.error("❌ ERROR: MYSQL_URL no está definida en variables de entorno.");
+  process.exit(1);
+}
+
+let pool;
+
+try {
+  pool = mysql.createPool(MYSQL_URL + "?ssl={" + JSON.stringify({
+      rejectUnauthorized: false
+  }) + "}");
+  console.log("✅ Conectado a MySQL (Railway → Render)");
+} catch (err) {
+  console.error("❌ Error conectando a MySQL:", err);
+  process.exit(1);
+}
+
+// ----------------------------
+//        ENDPOINTS
+// ----------------------------
+
+// GET all tasks
+app.get("/tasks", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM tasks ORDER BY createdAt DESC");
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error GET /tasks:", err);
+    res.status(500).json({ error: "Error al obtener tareas" });
   }
 });
 
-// Ruta principal
-app.get("/", (req, res) => {
-  res.send("API funcionando");
+// CREATE task
+app.post("/tasks", async (req, res) => {
+  try {
+    const { id, status, name, description, type, priority, who, date } = req.body;
+
+    const q = `
+      INSERT INTO tasks (id, status, name, description, type, priority, who, date, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    await pool.query(q, [
+      id,
+      status,
+      name,
+      description,
+      type,
+      priority,
+      who,
+      date
+    ]);
+
+    res.json({ message: "Tarea creada" });
+  } catch (err) {
+    console.error("❌ Error POST /tasks:", err);
+    res.status(500).json({ error: "Error al crear tarea" });
+  }
 });
 
-// Obtener tareas
-app.get("/tasks", (req, res) => {
-  db.query("SELECT * FROM tasks", (err, results) => {
-    if (err) return res.json({ error: err });
-    res.json(results);
-  });
-});
-
-// Crear tarea
-app.post("/tasks", (req, res) => {
-  const { name, description, status, type, priority, who, date } = req.body;
-
-  const query = `
-    INSERT INTO tasks (name, description, status, type, priority, who, date)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  db.query(
-    query,
-    [name, description, status, type, priority, who, date],
-    (err, result) => {
-      if (err) return res.json({ error: err });
-      res.json({ message: "Tarea creada", id: result.insertId });
-    }
-  );
-});
-
-// Arranque del servidor
+// ----------------------------
+//       START SERVER
+// ----------------------------
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
