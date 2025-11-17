@@ -3,29 +3,33 @@ const cors = require("cors");
 const mysql = require("mysql2");
 
 const app = express();
-app.use(cors({ origin: "*" }));
+app.use(cors());
 app.use(express.json());
 
+// Configuración de la base de datos
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "123456",
-  database: "backend_isis"
+  host: process.env.MYSQLHOST || "localhost",
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "123456",
+  database: process.env.MYSQLDATABASE || "backend_isis",
+  port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
 });
 
+// Probar conexión
 db.connect((err) => {
   if (err) {
-    console.log("Error de conexión MySQL", err);
+    console.log("Error al conectar con MySQL:", err);
   } else {
-    console.log("Conectado a MySQL 🚀");
+    console.log("Conectado a MySQL");
   }
 });
 
+// Ruta principal
 app.get("/", (req, res) => {
-  res.send("API funcionando 🚀");
+  res.send("API funcionando");
 });
 
-// GET all tasks
+// Obtener tareas
 app.get("/tasks", (req, res) => {
   db.query("SELECT * FROM tasks", (err, results) => {
     if (err) return res.json({ error: err });
@@ -33,7 +37,7 @@ app.get("/tasks", (req, res) => {
   });
 });
 
-// POST new task
+// Crear tarea
 app.post("/tasks", (req, res) => {
   const { name, description, status, type, priority, who, date } = req.body;
 
@@ -42,21 +46,19 @@ app.post("/tasks", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.query(query, [name, description, status, type, priority, who, date], (err, result) => {
-    if (err) return res.json({ error: err });
-    res.json({ message: "Tarea creada", id: result.insertId });
-  });
+  db.query(
+    query,
+    [name, description, status, type, priority, who, date],
+    (err, result) => {
+      if (err) return res.json({ error: err });
+      res.json({ message: "Tarea creada", id: result.insertId });
+    }
+  );
 });
 
-// Obtener todas las tareas
-app.get("/tasks", (req, res) => {
-  const query = "SELECT * FROM tasks ORDER BY id DESC";
-  db.query(query, (err, results) => {
-    if (err) return res.json({ error: err });
-    res.json(results);
-  });
+// Arranque del servidor
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
-
-
-const PORT = 3000;
-app.listen(PORT, () => console.log("Servidor corriendo en http://localhost:" + PORT));
