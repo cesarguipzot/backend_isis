@@ -24,7 +24,7 @@ try {
 
 
 // ----------------------------
-//  RUTAS
+//        RUTAS CRUD
 // ----------------------------
 
 // GET -> todas las tareas
@@ -39,7 +39,6 @@ app.get("/tasks", async (req, res) => {
     res.status(500).json({ error: "Error al obtener tareas" });
   }
 });
-
 
 // GET -> tarea por ID
 app.get("/tasks/:id", async (req, res) => {
@@ -63,7 +62,6 @@ app.get("/tasks/:id", async (req, res) => {
   }
 });
 
-
 // POST -> crear tarea
 app.post("/tasks", async (req, res) => {
   try {
@@ -83,6 +81,62 @@ app.post("/tasks", async (req, res) => {
   }
 });
 
+// PUT -> actualizar tarea completa
+app.put("/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, status, type, priority, who, date } = req.body;
+
+    const [result] = await pool.query(
+      `UPDATE tasks
+       SET name = ?, description = ?, status = ?, type = ?, priority = ?, who = ?, date = ?
+       WHERE id = ?`,
+      [name, description, status, type, priority, who, date, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Tarea no encontrada" });
+    }
+
+    res.json({ message: "Tarea actualizada correctamente" });
+
+  } catch (error) {
+    console.error("❌ Error al actualizar tarea:", error);
+    res.status(500).json({ error: "Error al actualizar tarea" });
+  }
+});
+
+// PATCH -> actualizar UN campo
+app.patch("/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const fields = req.body;
+
+    const keys = Object.keys(fields);
+    if (keys.length === 0) {
+      return res.status(400).json({ error: "No hay campos para actualizar" });
+    }
+
+    const updates = keys.map(key => `${key} = ?`).join(", ");
+    const values = keys.map(key => fields[key]);
+    values.push(id);
+
+    const [result] = await pool.query(
+      `UPDATE tasks SET ${updates} WHERE id = ?`,
+      values
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Tarea no encontrada" });
+    }
+
+    res.json({ message: "Tarea actualizada parcialmente" });
+
+  } catch (error) {
+    console.error("❌ Error al aplicar PATCH:", error);
+    res.status(500).json({ error: "Error al actualizar campos" });
+  }
+});
 
 // DELETE -> eliminar tarea
 app.delete("/tasks/:id", async (req, res) => {
