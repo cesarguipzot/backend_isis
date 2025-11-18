@@ -29,7 +29,9 @@ try {
 // GET -> obtener todas las tareas
 app.get("/tasks", async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM tasks ORDER BY createdAt DESC");
+    const [rows] = await pool.query(
+      "SELECT * FROM tasks ORDER BY createdAt DESC"
+    );
     res.json(rows);
   } catch (error) {
     console.error("❌ Error al obtener tareas:", error);
@@ -37,7 +39,7 @@ app.get("/tasks", async (req, res) => {
   }
 });
 
-// POST -> crear una tarea
+// POST -> crear tarea
 app.post("/tasks", async (req, res) => {
   try {
     const { name, description, status, type, priority, who, date } = req.body;
@@ -55,8 +57,22 @@ app.post("/tasks", async (req, res) => {
   }
 });
 
+// DELETE -> eliminar tarea por ID
+app.delete("/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.query("DELETE FROM tasks WHERE id = ?", [id]);
+
+    res.json({ message: "Tarea eliminada" });
+  } catch (error) {
+    console.error("❌ Error al eliminar tarea:", error);
+    res.status(500).json({ error: "Error al eliminar tarea" });
+  }
+});
+
 // ----------------------------
-// ARRANCAR SERVIDOR
+// INICIAR SERVIDOR
 // ----------------------------
 const PORT = process.env.PORT || 3000;
 
