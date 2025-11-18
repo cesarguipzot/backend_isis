@@ -14,7 +14,7 @@ let pool;
 try {
   pool = mysql.createPool({
     uri: process.env.MYSQL_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
   });
 
   console.log("✅ Conectado a MySQL correctamente");
@@ -22,17 +22,43 @@ try {
   console.error("❌ Error al conectar a MySQL:", error);
 }
 
-
 // ----------------------------
 //        RUTAS CRUD
 // ----------------------------
 
-// GET -> todas las tareas
+// GET -> todas las tareas (con filtros opcionales)
 app.get("/tasks", async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      "SELECT * FROM tasks ORDER BY createdAt DESC"
-    );
+    const { status, type, priority, who } = req.query;
+
+    let sql = "SELECT * FROM tasks";
+    const conditions = [];
+    const params = [];
+
+    if (status) {
+      conditions.push("status = ?");
+      params.push(status);
+    }
+    if (type) {
+      conditions.push("type = ?");
+      params.push(type);
+    }
+    if (priority) {
+      conditions.push("priority = ?");
+      params.push(priority);
+    }
+    if (who) {
+      conditions.push("who = ?");
+      params.push(who);
+    }
+
+    if (conditions.length > 0) {
+      sql += " WHERE " + conditions.join(" AND ");
+    }
+
+    sql += " ORDER BY createdAt DESC";
+
+    const [rows] = await pool.query(sql, params);
     res.json(rows);
   } catch (error) {
     console.error("❌ Error al obtener tareas:", error);
@@ -45,17 +71,13 @@ app.get("/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [rows] = await pool.query(
-      "SELECT * FROM tasks WHERE id = ?",
-      [id]
-    );
+    const [rows] = await pool.query("SELECT * FROM tasks WHERE id = ?", [id]);
 
     if (rows.length === 0) {
       return res.status(404).json({ error: "Tarea no encontrada" });
     }
 
     res.json(rows[0]);
-
   } catch (error) {
     console.error("❌ Error al obtener tarea por ID:", error);
     res.status(500).json({ error: "Error al obtener tarea" });
@@ -63,9 +85,18 @@ app.get("/tasks/:id", async (req, res) => {
 });
 
 // POST -> crear tarea
+// Para FAST_NOTE: si no mandas name/status/type/priority/who, se guardan como "" (vacío)
 app.post("/tasks", async (req, res) => {
   try {
-    const { name, description, status, type, priority, who, date } = req.body;
+    const {
+      name = "",
+      description = "",
+      status = "",
+      type = "",
+      priority = "",
+      who = "",
+      date = null,
+    } = req.body;
 
     const [result] = await pool.query(
       `INSERT INTO tasks (name, description, status, type, priority, who, date, createdAt)
@@ -74,7 +105,6 @@ app.post("/tasks", async (req, res) => {
     );
 
     res.json({ message: "Tarea creada", id: result.insertId });
-
   } catch (error) {
     console.error("❌ Error al crear tarea:", error);
     res.status(500).json({ error: "Error al crear tarea" });
@@ -85,7 +115,15 @@ app.post("/tasks", async (req, res) => {
 app.put("/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, status, type, priority, who, date } = req.body;
+    const {
+      name = "",
+      description = "",
+      status = "",
+      type = "",
+      priority = "",
+      who = "",
+      date = null,
+    } = req.body;
 
     const [result] = await pool.query(
       `UPDATE tasks
@@ -99,14 +137,13 @@ app.put("/tasks/:id", async (req, res) => {
     }
 
     res.json({ message: "Tarea actualizada correctamente" });
-
   } catch (error) {
     console.error("❌ Error al actualizar tarea:", error);
     res.status(500).json({ error: "Error al actualizar tarea" });
   }
 });
 
-// PATCH -> actualizar UN campo
+// PATCH -> actualizar uno o varios campos
 app.patch("/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -117,8 +154,8 @@ app.patch("/tasks/:id", async (req, res) => {
       return res.status(400).json({ error: "No hay campos para actualizar" });
     }
 
-    const updates = keys.map(key => `${key} = ?`).join(", ");
-    const values = keys.map(key => fields[key]);
+    const updates = keys.map((key) => `${key} = ?`).join(", ");
+    const values = keys.map((key) => fields[key]);
     values.push(id);
 
     const [result] = await pool.query(
@@ -131,7 +168,6 @@ app.patch("/tasks/:id", async (req, res) => {
     }
 
     res.json({ message: "Tarea actualizada parcialmente" });
-
   } catch (error) {
     console.error("❌ Error al aplicar PATCH:", error);
     res.status(500).json({ error: "Error al actualizar campos" });
@@ -143,23 +179,18 @@ app.delete("/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result] = await pool.query(
-      "DELETE FROM tasks WHERE id = ?",
-      [id]
-    );
+    const [result] = await pool.query("DELETE FROM tasks WHERE id = ?", [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Tarea no encontrada" });
     }
 
     res.json({ message: "Tarea eliminada" });
-
   } catch (error) {
     console.error("❌ Error al eliminar tarea:", error);
     res.status(500).json({ error: "Error al eliminar tarea" });
   }
 });
-
 
 // ----------------------------
 // INICIAR SERVIDOR
