@@ -22,11 +22,12 @@ try {
   console.error("❌ Error al conectar a MySQL:", error);
 }
 
+
 // ----------------------------
-// RUTAS
+//  RUTAS
 // ----------------------------
 
-// GET -> obtener todas las tareas
+// GET -> todas las tareas
 app.get("/tasks", async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -38,6 +39,30 @@ app.get("/tasks", async (req, res) => {
     res.status(500).json({ error: "Error al obtener tareas" });
   }
 });
+
+
+// GET -> tarea por ID
+app.get("/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await pool.query(
+      "SELECT * FROM tasks WHERE id = ?",
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Tarea no encontrada" });
+    }
+
+    res.json(rows[0]);
+
+  } catch (error) {
+    console.error("❌ Error al obtener tarea por ID:", error);
+    res.status(500).json({ error: "Error al obtener tarea" });
+  }
+});
+
 
 // POST -> crear tarea
 app.post("/tasks", async (req, res) => {
@@ -51,25 +76,36 @@ app.post("/tasks", async (req, res) => {
     );
 
     res.json({ message: "Tarea creada", id: result.insertId });
+
   } catch (error) {
     console.error("❌ Error al crear tarea:", error);
     res.status(500).json({ error: "Error al crear tarea" });
   }
 });
 
-// DELETE -> eliminar tarea por ID
+
+// DELETE -> eliminar tarea
 app.delete("/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query("DELETE FROM tasks WHERE id = ?", [id]);
+    const [result] = await pool.query(
+      "DELETE FROM tasks WHERE id = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Tarea no encontrada" });
+    }
 
     res.json({ message: "Tarea eliminada" });
+
   } catch (error) {
     console.error("❌ Error al eliminar tarea:", error);
     res.status(500).json({ error: "Error al eliminar tarea" });
   }
 });
+
 
 // ----------------------------
 // INICIAR SERVIDOR
